@@ -1,315 +1,374 @@
 //package solver;
- package com.kabir.milton;
+package com.kabir.milton;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayDeque;
-import java.util.Arrays;
-import java.util.Deque;
 import java.util.Scanner;
 
 class Row {
+    private final ComplexNumber[] elements;
 
-    private final double[] elements;
-    private final int size;
-
-    public Row(int size) {
-        this.size = size;
-        elements = new double[size];
+    public Row(ComplexNumber[] elements) {
+        this.elements = elements;
     }
 
-    public void setVal(int idx, double val) {
-        elements[idx] = val;
-    }
-
-    public int getSize() {
-        return elements.length;
-    }
-
-    public void divideRowByElement(int idx) {
-        double d = elements[idx];
-        for (int i = idx; i < size; i++) {
-            elements[i] /= d;
+    public Row(Row row) {
+        elements = new ComplexNumber[row.length()];
+        for (int i = 0; i < row.length(); i++) {
+            elements[i] = row.getElement(i);
         }
     }
 
-    public void subtractRowMultipliedByElement(Row row, int idx) {
-        double d = elements[idx];
-        for (int i = idx; i < size; i++) {
-            elements[i] -= row.elements[i] * d;
+    public ComplexNumber getElement(int index) {
+        return elements[index];
+    }
+
+    public void setElement(int position, ComplexNumber element) {
+        elements[position] = element;
+    }
+
+    public void multiply(ComplexNumber multiplier) {
+        for (int i = 0; i < elements.length; i++) {
+            elements[i] = elements[i].multiply(multiplier);
         }
     }
 
-    public double getElement(int idx) {
-        return elements[idx];
+    public void divide(ComplexNumber number) {
+        for (int i = 0; i < elements.length; i++) {
+            elements[i] = elements[i].divide(number);
+        }
     }
 
-    public double getLastElement() {
-        return elements[size - 1];
+    public void addition(Row addend) {
+        if (addend.length() == elements.length) {
+            for (int i = 0; i < elements.length; i++) {
+                elements[i] = elements[i].add(addend.getElement(i));
+            }
+        }
     }
 
-    public void swap(int i, int j) {
-        if (i == j) return;
-        double t = elements[i];
-        elements[i] = elements[j];
-        elements[j] = t;
+    public boolean hasNoSolution() {
+        int countZero = 0;
+        if (!elements[elements.length - 1].equal(new ComplexNumber(0, 0))) {
+            for (int i = 0; i < elements.length - 1; i++) {
+                if (elements[i].equal(new ComplexNumber(0, 0))) {
+                    countZero++;
+                }
+            }
+            return countZero == elements.length - 1;
+        }
+        return false;
     }
 
-    public boolean areTheFirstElementsZero() {
-        for (int i = 0; i < size - 1; i++) {
-            if (elements[i] != 0) {
+    public boolean isAllZero() {
+        for (ComplexNumber element : elements) {
+            if (!element.equal(new ComplexNumber(0, 0))) {
                 return false;
             }
         }
         return true;
     }
 
+    public int length() {
+        return elements.length;
+    }
 }
 
 class Matrix {
-
     private final Row[] rows;
-    private final int numRows;
-    private final Deque<Integer> columnsSwapStack;
+    private final int numberOfVariables;
+    private String solution;
 
-    public Matrix(int numRows, int rowSize) {
-        this.numRows = numRows;
-        rows = new Row[numRows];
-        for (int i = 0; i < numRows; i++) {
-            rows[i] = new Row(rowSize);
-        }
-        columnsSwapStack = new ArrayDeque<>();
+    public String getSolution() {
+        return solution;
     }
 
-    public Row getRow(int idx) {
-        return rows[idx];
+    public Matrix(int numberOfVariables, int numberOfEquations) {
+        this.numberOfVariables = numberOfVariables;
+        rows = new Row[numberOfEquations];
+        solution = "";
     }
 
-    public boolean divideRowByElement(int rowIdx, int elementIdx) {
-        if (findNonZeroCoefficient(rowIdx, elementIdx)) {
-            rows[rowIdx].divideRowByElement(elementIdx);
-            return true;
-        }
-        return false;
-    }
-
-    public void subtractRowFromRowsBelow(int rowIdx) {
-        Row row = rows[rowIdx];
-        for (int i = rowIdx + 1; i < numRows; i++) {
-            rows[i].subtractRowMultipliedByElement(row, rowIdx);
+    public void add(Row row, int index) {
+        if (index >= 0 && index < rows.length) {
+            rows[index] = row;
         }
     }
 
-    public void subtractRowFromRowsAbove(int rowIdx) {
-        Row row = rows[rowIdx];
-        for (int i = 0; i < rowIdx; i++) {
-            rows[i].subtractRowMultipliedByElement(row, rowIdx);
-        }
+    public void swapRow(int row1, int row2) {
+        Row aux = rows[row1];
+        rows[row1] = rows[row2];
+        rows[row2] = aux;
     }
 
-    public Deque<Integer> getColumnsSwapStack() {
-        return columnsSwapStack;
-    }
-
-    private boolean findNonZeroCoefficient(int rowIdx, int elementIdx) {
-        return findNonZeroCoefficient(rowIdx, elementIdx, rowIdx, elementIdx);
-    }
-
-    private boolean findNonZeroCoefficient(int rowIdx, int columnIdx, int initialRowIdx, int initialColumnIdx) {
-        if (rowIdx >= numRows || columnIdx >= rows[rowIdx].getSize() - 1) {
-            return false;
-        }
-
-        for (int i = rowIdx; i < numRows; i++) {
-            if (rows[i].getElement(columnIdx) != 0) {
-                swapRows(i, initialRowIdx);
-                swapColumns(columnIdx, initialColumnIdx);
-                return true;
-            }
-        }
-
-        int rowSize = rows[rowIdx].getSize() - 1;
-        for (int i = columnIdx + 1; i < rowSize; i++) {
-            if (rows[rowIdx].getElement(i) != 0) {
-                swapRows(rowIdx, initialRowIdx);
-                swapColumns(i, initialColumnIdx);
-                return true;
-            }
-        }
-
-        return findNonZeroCoefficient(rowIdx + 1, columnIdx + 1, initialRowIdx, initialColumnIdx);
-    }
-
-    private void swapRows(int i, int j) {
-        if (i == j) return;
-        Row temp = rows[i];
-        rows[i] = rows[j];
-        rows[j] = temp;
-    }
-
-    private void swapColumns(int i, int j) {
-        if (i == j) return;
-        columnsSwapStack.push(i);
-        columnsSwapStack.push(j);
+    public void swapColumns(int col1, int col2) {
+        ComplexNumber aux;
         for (Row row : rows) {
-            row.swap(i, j);
+            aux = row.getElement(col1);
+            row.setElement(col1, row.getElement(col2));
+            row.setElement(col2, aux);
         }
+    }
+
+    public void showResolution() {
+        for (int row = 0; row < rows.length; row++) {
+            if (rows[row].getElement(row).equal(new ComplexNumber(0, 0))) {
+                boolean leadingEntryZero = true;
+                for (int i = row + 1; i < rows.length; i++) {
+                    if (!rows[i].getElement(row).equal(new ComplexNumber(0, 0))) {
+                        swapRow(row, i);
+                        leadingEntryZero = false;
+                        System.out.println("Rows manipulation:");
+                        System.out.printf("R%d <-> R%d\n", row + 1, i + 1);
+                        break;
+                    }
+                }
+                if (leadingEntryZero) {
+                    for (int i = row; i < rows[row].length() - 1; i++) {
+                        if (!rows[row].getElement(i).equal(new ComplexNumber(0, 0))) {
+                            swapColumns(row, i);
+                            leadingEntryZero = false;
+                            System.out.println("Cols manipulation:");
+                            System.out.printf("C%d <-> C%d\n", row + 1, i + 1);
+                            break;
+                        }
+                    }
+                }
+                if (leadingEntryZero) {
+                    for (int i = row + 1; i < rows.length; i++) {
+                        for (int j = +1; j < rows[row].length() - 1; j++) {
+                            if (!rows[i].getElement(j).equal(new ComplexNumber(0, 0))) {
+                                swapRow(row, i);
+                                System.out.println("Rows manipulation:");
+                                System.out.printf("R%d <-> R%d\n", row + 1, i + 1);
+                                swapColumns(row, j);
+                                System.out.println("Cols manipulation:");
+                                System.out.printf("C%d <-> C%d\n", row + 1, j + 1);
+                                leadingEntryZero = false;
+                                break;
+                            }
+                        }
+                        if (!leadingEntryZero) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!rows[row].getElement(row).equal(new ComplexNumber(0, 0))) {
+                ComplexNumber actualNumber = rows[row].getElement(row);
+                if (!actualNumber.equal(new ComplexNumber(1, 0))) {
+                    rows[row].divide(actualNumber);
+                    System.out.println("R" + (row + 1) + " / " + actualNumber + " -> R" + (row + 1));
+                }
+                ComplexNumber leadingEntry;
+                for (int rowCol = row + 1; rowCol < rows.length; rowCol++) {
+                    leadingEntry = rows[rowCol].getElement(row);
+                    if (!leadingEntry.equal(new ComplexNumber(0, 0))) {
+                        leadingEntry = leadingEntry.multiply(-1);
+                        Row aux = new Row(rows[row]);
+                        aux.multiply(leadingEntry);
+                        rows[rowCol].addition(aux);
+                        System.out.println(leadingEntry + " * R" + (row + 1) + " + R" + (rowCol + 1) + " -> R" + (rowCol + 1));
+                    }
+                }
+            }
+        }
+
+        for (Row row : rows) {
+            if (row.hasNoSolution()) {
+                solution = "No solutions";
+                System.out.println(solution);
+                return;
+            }
+        }
+        int countZeroRows = 0;
+        for (Row row : rows) {
+            if (row.isAllZero()) {
+                countZeroRows++;
+            }
+        }
+        int significantEquations = rows.length - countZeroRows;
+        if (significantEquations < numberOfVariables) {
+            solution = "Infinitely many solutions";
+            System.out.println("Infinitely many solutions");
+            return;
+        }
+        for (int rowCol = rows.length - 1; rowCol > 0; rowCol--) {
+            ComplexNumber element;
+            for (int row = rowCol - 1; row >= 0; row--) {
+                element = rows[row].getElement(rowCol);
+                if (!element.equal(new ComplexNumber(0, 0))) {
+                    element = element.multiply(-1);
+                    Row aux = new Row(rows[rowCol]);
+                    aux.multiply(element);
+                    rows[row].addition(aux);
+                    System.out.println(element + " * R" + (rowCol + 1) + " + R" + (row + 1) + " -> R" + (row + 1));
+                }
+            }
+        }
+        StringBuilder strB = new StringBuilder();
+        for (int i = 0; i < numberOfVariables - 1; i++) {
+            strB.append(rows[i].getElement(rows[i].length() - 1)).append("\n");
+        }
+        strB.append(rows[numberOfVariables - 1].getElement(rows[numberOfVariables - 1].length() - 1));
+        solution = strB.toString();
     }
 }
 
-class LinearEquation {
+class ComplexNumber {
 
-    private final Matrix matrix;
-    private final int numEquations;
-    private final int numVars;
+    private final double real;
+    private final double imaginary;
 
-    LinearEquation(int numVars, int numEquations) {
-        this.numVars = numVars;
-        this.numEquations = numEquations;
-        matrix = new Matrix(numEquations, numVars + 1);
+    public ComplexNumber(double real, double imaginary) {
+        this.real = real;
+        this.imaginary = imaginary;
     }
 
-    public void setCoefficients(double[] coeffs) {
-        int rowSize = numVars + 1;
-        if (coeffs.length != numEquations * rowSize) {
-            throw new IllegalArgumentException();
-        }
+    public ComplexNumber(String str) {
+        String real;
+        String imaginary;
+        int length = str.length();
+        int index;
 
-        for (int i = 0; i < numEquations; i++) {
-            Row row = matrix.getRow(i);
-            for (int j = 0; j < rowSize; j++) {
-                row.setVal(j, coeffs[i * rowSize + j]);
+        if (str.lastIndexOf('+') != -1) {
+            index = str.indexOf('+');
+            real = str.substring(0, index);
+            if (index + 1 == length - 1) {
+                imaginary = "1";
+            } else {
+                imaginary = str.substring(index + 1, length - 1);
             }
-        }
-    }
-
-    public double[] solve() {
-        makeEchelonMatrix();
-        if (containsContradiction()) {
-            return null;
-        }
-        if (getSignificantEquations() < numVars) {
-            return new double[]{Double.POSITIVE_INFINITY};
-        }
-        backSolving();
-        return getSolution();
-    }
-
-    private void makeEchelonMatrix() {
-        for (int i = 0; i < numEquations; i++) {
-            if (!matrix.divideRowByElement(i, i)) {
-                return;
+        } else if (str.lastIndexOf('-') != -1 && str.lastIndexOf('-') != 0) {
+            index = str.lastIndexOf('-');
+            real = str.substring(0, index);
+            if (index + 1 == length - 1) {
+                imaginary = "-1";
+            } else {
+                imaginary = str.substring(index, length - 1);
             }
-            matrix.subtractRowFromRowsBelow(i);
-        }
-    }
 
-    private boolean containsContradiction() {
-        for (int i = 0; i < numEquations; i++) {
-            Row row = matrix.getRow(i);
-            if (row.areTheFirstElementsZero() && row.getLastElement() != 0) {
-                return true;
+        } else if (str.lastIndexOf('i') != -1) {
+            if ("i".equals(str)) {
+                imaginary = "1";
+
+            } else if ("-i".equals(str)) {
+                imaginary = "-1";
+            } else {
+                imaginary = str.substring(0, length - 1);
             }
+            real = "0";
+        } else {
+            real = str.substring(0, length);
+            imaginary = "0";
         }
-        return false;
+        this.real = Double.parseDouble(real);
+        this.imaginary = Double.parseDouble(imaginary);
     }
 
-    private int getSignificantEquations() {
-        int significantEquations = 0;
-        for (int i = 0; i < numEquations; i++) {
-            if (!matrix.getRow(i).areTheFirstElementsZero()) {
-                significantEquations++;
+    public ComplexNumber add(ComplexNumber num) {
+        return new ComplexNumber(this.real + num.real, this.imaginary + num.imaginary);
+    }
+
+    public ComplexNumber multiply(double num) {
+        return new ComplexNumber(num * real, num * imaginary);
+    }
+
+    public ComplexNumber multiply(ComplexNumber num) {
+        double re = this.real * num.getReal() - (this.imaginary * num.getImaginary());
+        double im = this.getReal() * num.getImaginary() + this.imaginary * num.getReal();
+        return new ComplexNumber(re, im);
+    }
+
+    public ComplexNumber divide(ComplexNumber that) {
+        return this.multiply(that.reciprocal());
+    }
+
+    public ComplexNumber reciprocal() {
+        double scale = real * real + imaginary * imaginary;
+        return new ComplexNumber(real / scale, -imaginary / scale);
+    }
+
+    public boolean equal(ComplexNumber that) {
+        return this.real == that.real && this.imaginary == that.imaginary;
+    }
+
+    public double getReal() {
+        return real;
+    }
+
+    public double getImaginary() {
+        return imaginary;
+    }
+
+    @Override
+    public String toString() {
+        if (real == 0) {
+            if (imaginary == 0) {
+                return "0";
             }
+            return imaginary + "i";
         }
-        return significantEquations;
-    }
+        if (imaginary == 0) return real + "";
+        if (imaginary == 1) return "i";
 
-    private void backSolving() {
-        for (int i = numEquations - 1; i > 0; i--) {
-            matrix.subtractRowFromRowsAbove(i);
-        }
+        if (imaginary < 0) return (real + "-" + (-imaginary) + "i");
+        return real + "+" + imaginary + "i";
     }
-
-    private double[] getSolution() {
-        double[] solution = new double[numEquations];
-        for (int i = 0; i < numEquations; i++) {
-            solution[i] = matrix.getRow(i).getLastElement();
-        }
-        Deque<Integer> swapStack = matrix.getColumnsSwapStack();
-        while (!swapStack.isEmpty()) {
-            swap(solution, swapStack.pop(), swapStack.pop());
-        }
-        return Arrays.copyOf(solution, numVars);
-    }
-
-    public void swap(double[] arr, int i, int j) {
-        if (i == j) return;
-        double t = arr[i];
-        arr[i] = arr[j];
-        arr[j] = t;
-    }
-
 }
 
 public class Main {
     public static void main(String[] args) {
-        if (args.length != 4) {
-            System.out.println("Error");
-        }
-
-        String inFile = null;
-        String outFile = null;
-        for (int i = 0; i < 4; i += 2) {
-            switch (args[i]) {
-                case "-in":
-                    inFile = args[i + 1];
-                    break;
-                case "-out":
-                    outFile = args[i + 1];
-                    break;
+        if (args.length == 4 && "-in".equals(args[0]) && "-out".equals(args[2])) {
+            Matrix matrix = readFile(args[1]);
+            if (matrix != null) {
+                matrix.showResolution();
+                System.out.println("The solution is: \n" + matrix.getSolution());
+                writeFile(matrix.getSolution(), args[3]);
+                System.out.println("Saved to file " + args[3]);
             }
         }
-
-        LinearEquation equation = readEquation(inFile);
-        double[] solution = equation.solve();
-        writeSolution(outFile, solution);
     }
 
-    private static LinearEquation readEquation(String file) {
-        try (BufferedReader br = Files.newBufferedReader(Path.of(file))) {
-            Scanner sc = new Scanner(br);
-            int numVars = sc.nextInt();
-            int numEquations = sc.nextInt();
-            LinearEquation equation = new LinearEquation(numVars, numEquations);
-            double[] coeffs = new double[numEquations * (numVars + 1)];
-            for (int i = 0; i < coeffs.length; i++) {
-                coeffs[i] = sc.nextDouble();
+    private static Row getLinearEquation(String str) {
+        String[] itemsInLine = str.split("\\s+");
+        ComplexNumber[] equation = new ComplexNumber[itemsInLine.length];
+        for (int i = 0; i < equation.length; i++) {
+            equation[i] = new ComplexNumber(itemsInLine[i]);
+        }
+        return new Row(equation);
+    }
+
+    private static Matrix readFile(String pathToFile) {
+        File file = new File(pathToFile);
+
+        try (Scanner scanner = new Scanner(file)) {
+
+            int numberOfVariables = scanner.nextInt();
+            int numberOfEquations = Integer.parseInt(scanner.nextLine().trim());
+            Matrix matrix = new Matrix(numberOfVariables, numberOfEquations);
+            int count = 0;
+            while (scanner.hasNext()) {
+                Row row = getLinearEquation(scanner.nextLine());
+                matrix.add(row, count++);
             }
-            equation.setCoefficients(coeffs);
-            return equation;
-        } catch (IOException e) {
-            e.printStackTrace();
+            return matrix;
+        } catch (FileNotFoundException e) {
+            System.out.println("No file found: " + pathToFile);
         }
         return null;
     }
 
-    private static void writeSolution(String file, double[] solution) {
-        try (BufferedWriter bw = Files.newBufferedWriter(Path.of(file))) {
-            if (solution == null) {
-                bw.write("No solutions");
-            } else if (solution[0] == Double.POSITIVE_INFINITY) {
-                bw.write("Infinitely many solutions");
-            } else {
-                for (double d : solution) {
-                    bw.write(Double.toString(d));
-                    bw.newLine();
-                }
-            }
+    private static void writeFile(String solution, String pathToFile) {
+        File file = new File(pathToFile);
+
+        try (FileWriter writer = new FileWriter(file)) {
+            writer.write(solution);
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.printf("An exception occurs %s", e.getMessage());
         }
     }
 }
